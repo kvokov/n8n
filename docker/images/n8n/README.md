@@ -2,8 +2,7 @@
 
 ![n8n.io - Workflow Automation](https://raw.githubusercontent.com/n8n-io/n8n/master/docs/images/n8n-logo.png)
 
-n8n is a free and open node based Workflow Automation Tool. It can be
-self-hosted, easily extended, and so also used with internal tools.
+n8n is a free and open [fair-code](http://faircode.io) licensed node based Workflow Automation Tool. It can be self-hosted, easily extended, and so also used with internal tools.
 
 <a href="https://raw.githubusercontent.com/n8n-io/n8n/master/docs/images/n8n-screenshot.png"><img src="https://raw.githubusercontent.com/n8n-io/n8n/master/docs/images/n8n-screenshot.png" width="550" alt="n8n.io - Screenshot"></a>
 
@@ -157,6 +156,7 @@ Replace the following placeholders with the actual data:
  - <POSTGRES_PASSWORD>
  - <POSTGRES_PORT>
  - <POSTGRES_USER>
+ - <POSTGRES_SCHEMA>
 
 ```
 docker run -it --rm \
@@ -167,6 +167,7 @@ docker run -it --rm \
 	-e DB_POSTGRESDB_HOST=<POSTGRES_HOST> \
 	-e DB_POSTGRESDB_PORT=<POSTGRES_PORT> \
 	-e DB_POSTGRESDB_USER=<POSTGRES_USER> \
+	-e DB_POSTGRESDB_SCHEMA=<POSTGRES_SCHEMA> \
 	-e DB_POSTGRESDB_PASSWORD=<POSTGRES_PASSWORD> \
   -v ~/.n8n:/root/.n8n \
   n8nio/n8n \
@@ -215,6 +216,7 @@ The following environment variables support file input:
  - DB_POSTGRESDB_PASSWORD_FILE
  - DB_POSTGRESDB_PORT_FILE
  - DB_POSTGRESDB_USER_FILE
+ - DB_POSTGRESDB_SCHEMA_FILE
  - N8N_BASIC_AUTH_PASSWORD_FILE
  - N8N_BASIC_AUTH_USER_FILE
 
@@ -299,6 +301,6 @@ Before you upgrade to the latest version make sure to check here if there are an
 
 ## License
 
-n8n is licensed under [**Apache 2.0 with Commons Clause**](https://github.com/n8n-io/n8n/blob/master/packages/cli/LICENSE.md)
+n8n is [fair-code](http://faircode.io) licensed under [**Apache 2.0 with Commons Clause**](https://github.com/n8n-io/n8n/blob/master/packages/cli/LICENSE.md)
 
 Additional information about license can be found in the [FAQ](https://docs.n8n.io/#/faq?id=license)

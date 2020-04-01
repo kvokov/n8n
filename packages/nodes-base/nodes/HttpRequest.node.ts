@@ -7,6 +7,7 @@ import {
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
+	IBinaryData,
 } from 'n8n-workflow';
 
 import { OptionsWithUri } from 'request';
@@ -356,7 +357,9 @@ export class HttpRequest implements INodeType {
 						],
 					},
 				},
-				description: 'Name of the binary property which contains<br />the data for the file to be uploaded.',
+				description: `Name of the binary property which contains the data for the file to be uploaded.<br />
+							For Form-Data Multipart, multiple can be provided in the format:<br />
+							"sendKey1:binaryProperty1,sendKey2:binaryProperty2`,
 			},
 			{
 				displayName: 'Body Parameters',
@@ -586,9 +589,10 @@ export class HttpRequest implements INodeType {
 			},
 		};
 
+		let response: any; // tslint:disable-line:no-any
 		const returnItems: INodeExecutionData[] = [];
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-			const options = this.getNodeParameter('options', 0, {}) as IDataObject;
+			const options = this.getNodeParameter('options', itemIndex, {}) as IDataObject;
 			const url = this.getNodeParameter('url', itemIndex) as string;
 
 			const fullResponse = !!options.fullResponse as boolean;
@@ -635,10 +639,15 @@ export class HttpRequest implements INodeType {
 						const sendBinaryData = this.getNodeParameter('sendBinaryData', itemIndex, false) as boolean;
 						if (sendBinaryData === true) {
 
-							if (options.bodyContentType !== 'raw') {
+							const contentTypesAllowed = [
+								'raw',
+								'multipart-form-data',
+							];
+
+							if (!contentTypesAllowed.includes(options.bodyContentType as string)) {
 								// As n8n-workflow.NodeHelpers.getParamterResolveOrder can not be changed
 								// easily to handle parameters in dot.notation simply error for now.
-								throw new Error('Sending binary data is only supported when option "Body Content Type" is set to "RAW/CUSTOM"!');
+								throw new Error('Sending binary data is only supported when option "Body Content Type" is set to "RAW/CUSTOM" or "FORM-DATA/MULTIPART"!');
 							}
 
 							const item = items[itemIndex];
@@ -647,12 +656,44 @@ export class HttpRequest implements INodeType {
 								throw new Error('No binary data exists on item!');
 							}
 
-							const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
-							if (item.binary[binaryPropertyName] === undefined) {
-								throw new Error(`No binary data property "${binaryPropertyName}" does not exists on item!`);
-							}
+							if (options.bodyContentType === 'raw') {
+								const binaryPropertyName = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
+								if (item.binary[binaryPropertyName] === undefined) {
+									throw new Error(`No binary data property "${binaryPropertyName}" does not exists on item!`);
+								}
+								const binaryProperty = item.binary[binaryPropertyName] as IBinaryData;
+								requestOptions.body = Buffer.from(binaryProperty.data, BINARY_ENCODING);
+							} else if (options.bodyContentType === 'multipart-form-data') {
+								requestOptions.body = {};
+								const binaryPropertyNameFull = this.getNodeParameter('binaryPropertyName', itemIndex) as string;
+								const binaryPropertyNames = binaryPropertyNameFull.split(',').map(key => key.trim());
 
-							requestOptions.body = Buffer.from(item.binary[binaryPropertyName].data, BINARY_ENCODING);
+								for (const propertyData of binaryPropertyNames) {
+									let propertyName = 'file';
+									let binaryPropertyName = propertyData;
+									if (propertyData.includes(':')) {
+										const propertyDataParts = propertyData.split(':');
+										propertyName = propertyDataParts[0];
+										binaryPropertyName = propertyDataParts[1];
+									} else if (binaryPropertyNames.length > 1) {
+										throw new Error('If more than one property should be send it is needed to define the in the format: "sendKey1:binaryProperty1,sendKey2:binaryProperty2"');
+									}
+
+									if (item.binary[binaryPropertyName] === undefined) {
+										throw new Error(`No binary data property "${binaryPropertyName}" does not exists on item!`);
+									}
+
+									const binaryProperty = item.binary[binaryPropertyName] as IBinaryData;
+
+									requestOptions.body[propertyName] = {
+										value: Buffer.from(binaryProperty.data, BINARY_ENCODING),
+										options: {
+											filename: binaryProperty.fileName,
+											contentType: binaryProperty.mimeType,
+										},
+									};
+								}
+							}
 							continue;
 						}
 					}
@@ -741,8 +782,17 @@ export class HttpRequest implements INodeType {
 				requestOptions.json = true;
 			}
 
-			// Now that the options are all set make the actual http request
-			const response = await this.helpers.request(requestOptions);
+			try {
+				// Now that the options are all set make the actual http request
+				response = await this.helpers.request(requestOptions);
+			} catch (error) {
+				if (this.continueOnFail() === true) {
+					returnItems.push({ json: { error } });
+					continue;
+				}
+
+				throw error;
+			}
 
 			if (responseFormat === 'file') {
 				const dataPropertyName = this.getNodeParameter('dataPropertyName', 0) as string;

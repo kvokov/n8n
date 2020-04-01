@@ -1,5 +1,8 @@
 import * as express from 'express';
 import {
+	readFileSync,
+} from 'fs';
+import {
 	dirname as pathDirname,
 	join as pathJoin,
 } from 'path';
@@ -97,6 +100,10 @@ class App {
 	push: Push.Push;
 	versions: IPackageVersions | undefined;
 
+	protocol: string;
+	sslKey:  string;
+	sslCert: string;
+
 	constructor() {
 		this.app = express();
 
@@ -112,6 +119,10 @@ class App {
 		this.push = Push.getInstance();
 
 		this.activeExecutionsInstance = ActiveExecutions.getInstance();
+
+		this.protocol = config.get('protocol');
+		this.sslKey  = config.get('ssl_key');
+		this.sslCert = config.get('ssl_cert');
 	}
 
 
@@ -973,6 +984,12 @@ class App {
 				workflowData: fullExecutionData.workflowData,
 			};
 
+			const lastNodeExecuted = data!.executionData!.resultData.lastNodeExecuted as string;
+
+			// Remove the old error and the data of the last run of the node that it can be replaced
+			delete data!.executionData!.resultData.error;
+			data!.executionData!.resultData.runData[lastNodeExecuted].pop();
+
 			if (req.body.loadWorkflow === true) {
 				// Loads the currently saved workflow to execute instead of the
 				// one saved at the time of the execution.
@@ -981,6 +998,18 @@ class App {
 
 				if (data.workflowData === undefined) {
 					throw new Error(`The workflow with the ID "${workflowId}" could not be found and so the data not be loaded for the retry.`);
+				}
+
+				// Replace all of the nodes in the execution stack with the ones of the new workflow
+				for (const stack of data!.executionData!.executionData!.nodeExecutionStack) {
+					// Find the data of the last executed node in the new workflow
+					const node = data.workflowData.nodes.find(node => node.name === stack.node.name);
+					if (node === undefined) {
+						throw new Error(`Could not find the node "${stack.node.name}" in workflow. It probably got deleted or renamed. Without it the workflow can sadly not be retried.`);
+					}
+
+					// Replace the node data in the stack that it really uses the current data
+					stack.node = node;
 				}
 			}
 
@@ -1081,16 +1110,7 @@ class App {
 		// Removes a test webhook
 		this.app.delete('/rest/test-webhook/:id', ResponseHelper.send(async (req: express.Request, res: express.Response): Promise<boolean> => {
 			const workflowId = req.params.id;
-
-			const workflowData = await Db.collections.Workflow!.findOne(workflowId);
-			if (workflowData === undefined) {
-				throw new ResponseHelper.ResponseError(`Could not find workflow with id "${workflowId}" so webhook could not be deleted!`);
-			}
-
-			const nodeTypes = NodeTypes();
-			const workflow = new Workflow({ id: workflowId.toString(), name: workflowData.name, nodes: workflowData.nodes, connections: workflowData.connections, active: workflowData.active, nodeTypes, staticData: workflowData.staticData, settings: workflowData.settings });
-
-			return this.testWebhooks.cancelTestWebhook(workflowId, workflow);
+			return this.testWebhooks.cancelTestWebhook(workflowId);
 		}));
 
 
@@ -1246,7 +1266,20 @@ export async function start(): Promise<void> {
 
 	await app.config();
 
-	app.app.listen(PORT, async () => {
+	let server;
+
+	if (app.protocol === 'https' && app.sslKey && app.sslCert){
+		const https = require('https');
+		const privateKey = readFileSync(app.sslKey, 'utf8');
+		const cert = readFileSync(app.sslCert, 'utf8');
+		const credentials = { key: privateKey,cert };
+		server = https.createServer(credentials,app.app);
+	}else{
+		const http = require('http');
+		server = http.createServer(app.app);
+	}
+
+	server.listen(PORT, async () => {
 		const versions = await GenericHelpers.getVersions();
 		console.log(`n8n ready on port ${PORT}`);
 		console.log(`Version: ${versions.cli}`);

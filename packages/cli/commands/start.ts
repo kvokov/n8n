@@ -2,7 +2,7 @@ import * as localtunnel from 'localtunnel';
 import {
 	TUNNEL_SUBDOMAIN_ENV,
 	UserSettings,
-} from "n8n-core";
+} from 'n8n-core';
 import { Command, flags } from '@oclif/command';
 const open = require('open');
 // import { dirname } from 'path';
@@ -19,10 +19,6 @@ import {
 	TestWebhooks,
 } from "../src";
 
-
-// // Add support for internationalization
-// const fullIcuPath = require.resolve('full-icu');
-// process.env.NODE_ICU_DATA = dirname(fullIcuPath);
 
 let activeWorkflowRunner: ActiveWorkflowRunner.ActiveWorkflowRunner | undefined;
 let processExistCode = 0;

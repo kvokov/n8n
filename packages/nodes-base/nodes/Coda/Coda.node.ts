@@ -33,7 +33,7 @@ import {
 export class Coda implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Coda',
-		name: 'Coda',
+		name: 'coda',
 		icon: 'file:coda.png',
 		group: ['output'],
 		version: 1,
@@ -623,7 +623,7 @@ export class Coda implements INodeType {
 					}
 					body.row = {
 						cells
-					},
+					};
 					await codaApiRequest.call(this, 'PUT', endpoint, body, qs);
 				}
 				return [items];

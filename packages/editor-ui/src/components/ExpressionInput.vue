@@ -122,6 +122,13 @@ export default mixins(
 				readOnly: !!this.resolvedValue,
 				modules: {
 					autoformat: {},
+					keyboard: {
+						bindings: {
+							'list autofill': {
+								prefix: /^$/,
+							},
+						},
+					},
 				},
 			});
 
@@ -166,11 +173,11 @@ export default mixins(
 				let returnValue;
 				try {
 					returnValue = this.resolveExpression(`=${variableName}`);
-				} catch (e) {
-					return 'invalid';
+				} catch (error) {
+					return `[invalid (${error.message})]`;
 				}
 				if (returnValue === undefined) {
-					return 'not found';
+					return '[not found]';
 				}
 
 				return returnValue;
